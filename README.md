@@ -212,6 +212,72 @@ legend(x=0.8, y=1.1, legend = c("Q1","Q2","Q3","Q4"), bty = "n", pch=20 , col=co
 <br>
 <br>
 
+## U.S. Foreign-Born Population
+Data was downloaded from the United States Census Bureau to understand the distribution of foreign-born population acoss different states. 
+
+### Analysis
+Below map shows the percentage of foreign-born population in each state:
+* The coastal states had higher percentage of population who were foreign-born.
+* California was the state with the highest foreign-born population, followed by New York State.
+
+<img src="https://github.com/jessy-chang/data-visualizations/blob/main/US_foreign_born/Rplot.png" width="800">
+
+```r
+library(geojsonio)
+library(broom)
+library(data.table)
+library(ggplot2)
+library(sp)
+
+# Geojson data source: https://eric.clst.org/tech/usgeojson/
+spdf <- geojson_read("Data/gz_2010_us_040_00_500k.json",  what = "sp")
+
+# Remove Alaska, Puerto Rico, Hawaii
+spdf <- spdf[ !(spdf@data$NAME  %in% c("Alaska","Puerto Rico","Hawaii")), ]
+spdf_fortified <- tidy(spdf, region = "STATE")
+
+# Foreign Born data source: https://data.census.gov/cedsci/table?q=Foreign%20Born&t=Foreign%20Born&hidePreview=false&tid=ACSDP1Y2018.DP02
+df <- fread("Data/ACSDP1Y2018.DP02_data_with_overlays_2020-05-31T172915.csv",
+            select = c("GEO_ID", "NAME", "DP02_0092PE"))
+df <- df[-1, ]
+df[, DP02_0092PE := as.numeric(DP02_0092PE)]
+setnames(df, old = 'DP02_0092PE', new = 'FOREIGN_BORN_PCT')
+df[, STATE.abbr := state.abb[match(NAME, state.name)]]
+df[is.na(STATE.abbr), STATE.abbr := 'DC']
+df[NAME.x == 'Virginia' , STATE.abbr := 'VA']
+
+# Merge numeric data with geocode data
+df <- merge(spdf@data, df, by = "GEO_ID")
+spdf_fortified <- merge(spdf_fortified, df, by.x = 'id', by.y = 'STATE')
+spdf_fortified <- data.frame(spdf_fortified)
+
+# Create state labels
+centroids.df <- as.data.frame(coordinates(spdf))
+names(centroids.df) <- c("Longitude", "Latitude")
+pop.df <- data.frame(id = spdf$STATE, centroids.df)
+pop.df <- merge(pop.df, df[, c('STATE','STATE.abbr')], by.x = 'id', by.y = 'STATE')
+
+
+# Plot Choropleth map
+ggplot() +
+  geom_polygon(data = spdf_fortified, aes(fill = FOREIGN_BORN_PCT, x = long, y = lat, group = group)) +
+  geom_text(data=pop.df[!(pop.df$STATE.abbr %in% 'DC'),], aes(Longitude, Latitude, label = STATE.abbr), size=2) +
+  scale_fill_gradient(high = "#4A235A", low = "#F4ECF7", guide = "colorbar") +
+  labs(fill = "Foreign Born (%)") +
+  theme_void() +
+  theme(legend.title=element_text(size=8)) +
+  coord_map()
+
+```
+### Links & Resources 
+**Census Data Source**: https://data.census.gov/cedsci/table?q=Foreign%20Born&t=Foreign%20Born&hidePreview=false&tid=ACSDP1Y2018.DP02   
+**Geojson Data Source**: https://eric.clst.org/tech/usgeojson/   
+**Downloaded Datasets**: https://github.com/jessy-chang/data-visualizations/tree/main/US_foreign_born/Data   
+**Full R Code:** https://github.com/jessy-chang/data-visualizations/blob/main/US_foreign_born/r_code.R   
+
+<br>
+<br>
+
 ## Mobile Operating System Market Share
 Google's Android is the leader in the mobile operating system market in Africa. In December 2019, it accounted for almost 84 percent of the mobile OS market, with Apple's iOS being the next major competitor, which has gained considerable market share in recent months. All the other operating systems had a market share of about five percent in December 2019.
 
